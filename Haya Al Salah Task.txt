@@ -1,0 +1,8 @@
+Haya Al Salah Task
+back button on exist
+Set frame size of video and thumbnail
+Favorite setting
+action button settings (instead of vectors)
+Topics and category design
+Splash Screen
+Video player ten sec forward and back button
