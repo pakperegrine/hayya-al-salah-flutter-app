@@ -54,12 +54,16 @@ jobs:
         FASTLANE_SKIP_UPDATE_CHECK: true
         
     - name: Import Code-Signing Certificates
+      id: import-certs
+      continue-on-error: true
       uses: Apple-Actions/import-codesign-certs@v2
       with:
         p12-file-base64: ${{ secrets.IOS_DIST_SIGNING_KEY }}
         p12-password: ${{ secrets.IOS_DIST_SIGNING_KEY_PASSWORD }}
         
     - name: Download Provisioning Profiles
+      id: download-profiles
+      continue-on-error: true
       uses: Apple-Actions/download-provisioning-profiles@v2
       with:
         bundle-id: com.pakperegrine.hayya-alal-salah
@@ -67,11 +71,18 @@ jobs:
         api-key-id: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
         api-private-key: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
         
-    - name: Build Flutter iOS (Release with Code Signing)
+    - name: Build Flutter iOS (Release)
       run: |
-        flutter build ios --release
+        if [ "${{ steps.import-certs.outcome }}" == "success" ] && [ "${{ steps.download-profiles.outcome }}" == "success" ]; then
+          echo "✅ Building with code signing"
+          flutter build ios --release
+        else
+          echo "⚠️ Building without code signing (certificates not available)"
+          flutter build ios --release --no-codesign
+        fi
         
     - name: Build and Deploy to App Store
+      if: ${{ steps.import-certs.outcome == 'success' && steps.download-profiles.outcome == 'success' }}
       run: |
         cd ios
         bundle exec fastlane release
@@ -79,6 +90,16 @@ jobs:
         FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD: ${{ secrets.FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD }}
         FASTLANE_SESSION: ${{ secrets.FASTLANE_SESSION }}
         FASTLANE_USER: ${{ secrets.FASTLANE_USER }}
+        
+    - name: Skip App Store Deploy (Certificates Not Available)
+      if: ${{ steps.import-certs.outcome != 'success' || steps.download-profiles.outcome != 'success' }}
+      run: |
+        echo "⚠️ Skipping App Store deployment - code signing certificates not available"
+        echo "📋 To enable App Store deployment:"
+        echo "   1. Export your Distribution Certificate as .p12"
+        echo "   2. Convert to base64: base64 -i certificate.p12"
+        echo "   3. Add as IOS_DIST_SIGNING_KEY secret in GitHub"
+        echo "   4. Add certificate password as IOS_DIST_SIGNING_KEY_PASSWORD"
         
     - name: Upload iOS Build Artifacts
       uses: actions/upload-artifact@v4
