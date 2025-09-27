@@ -32,10 +32,8 @@ class AppThemes {
         brightness: Brightness.light,
         primary: primaryColor,
         surface: lightSurface,
-        background: lightBackground,
         onPrimary: Colors.white,
         onSurface: lightTextPrimary,
-        onBackground: lightTextPrimary,
       ),
       appBarTheme: AppBarTheme(
         backgroundColor: primaryColor,
@@ -188,10 +186,8 @@ class AppThemes {
         brightness: Brightness.dark,
         primary: primaryColor,
         surface: darkSurface,
-        background: darkBackground,
         onPrimary: Colors.white,
         onSurface: darkTextPrimary,
-        onBackground: darkTextPrimary,
       ),
       appBarTheme: AppBarTheme(
         backgroundColor: primaryColor,
