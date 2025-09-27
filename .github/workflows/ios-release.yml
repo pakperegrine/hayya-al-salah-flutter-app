@@ -53,34 +53,32 @@ jobs:
       env:
         FASTLANE_SKIP_UPDATE_CHECK: true
         
-    # - name: Import Code-Signing Certificates
-    #   if: ${{ env.IOS_DIST_SIGNING_KEY != '' }}
-    #   uses: Apple-Actions/import-codesign-certs@v2
-    #   with:
-    #     p12-file-base64: ${{ secrets.IOS_DIST_SIGNING_KEY }}
-    #     p12-password: ${{ secrets.IOS_DIST_SIGNING_KEY_PASSWORD }}
-    #     
-    # - name: Download Provisioning Profiles
-    #   if: ${{ env.APP_STORE_CONNECT_API_KEY != '' }}
-    #   uses: Apple-Actions/download-provisioning-profiles@v2
-    #   with:
-    #     bundle-id: com.pakperegrine.hayya-alal-salah
-    #     issuer-id: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
-    #     api-key-id: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-    #     api-private-key: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+    - name: Import Code-Signing Certificates
+      uses: Apple-Actions/import-codesign-certs@v2
+      with:
+        p12-file-base64: ${{ secrets.IOS_DIST_SIGNING_KEY }}
+        p12-password: ${{ secrets.IOS_DIST_SIGNING_KEY_PASSWORD }}
         
-    - name: Build Flutter iOS (No Code Signing)
+    - name: Download Provisioning Profiles
+      uses: Apple-Actions/download-provisioning-profiles@v2
+      with:
+        bundle-id: com.pakperegrine.hayya-alal-salah
+        issuer-id: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+        api-key-id: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+        api-private-key: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+        
+    - name: Build Flutter iOS (Release with Code Signing)
       run: |
-        flutter build ios --release --no-codesign
+        flutter build ios --release
         
-    # - name: Build and Deploy to App Store
-    #   run: |
-    #     cd ios
-    #     bundle exec fastlane release
-    #   env:
-    #     FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD: ${{ secrets.FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD }}
-    #     FASTLANE_SESSION: ${{ secrets.FASTLANE_SESSION }}
-    #     FASTLANE_USER: ${{ secrets.FASTLANE_USER }}
+    - name: Build and Deploy to App Store
+      run: |
+        cd ios
+        bundle exec fastlane release
+      env:
+        FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD: ${{ secrets.FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD }}
+        FASTLANE_SESSION: ${{ secrets.FASTLANE_SESSION }}
+        FASTLANE_USER: ${{ secrets.FASTLANE_USER }}
         
     - name: Upload iOS Build Artifacts
       uses: actions/upload-artifact@v4
