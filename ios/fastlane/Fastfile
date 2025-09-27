@@ -1,0 +1,72 @@
+# This file contains the fastlane.tools configuration
+# You can find the documentation at https://docs.fastlane.tools
+#
+# For a list of all available actions, check out
+#
+#     https://docs.fastlane.tools/actions
+#
+# For a list of all available plugins, check out
+#
+#     https://docs.fastlane.tools/plugins/available-plugins
+#
+
+# Uncomment the line if you want fastlane to automatically update itself
+# update_fastlane
+
+default_platform(:ios)
+
+platform :ios do
+  desc "Build and upload to App Store Connect"
+  lane :release do
+    # Increment build number
+    increment_build_number(xcodeproj: "Runner.xcodeproj")
+    
+    # Build the app
+    build_app(
+      scheme: "Runner",
+      workspace: "Runner.xcworkspace",
+      include_bitcode: false,
+      export_method: "app-store",
+      export_options: {
+        provisioningProfiles: {
+          "com.pakperegrine.hayya-alal-salah" => "match AppStore com.pakperegrine.hayya-alal-salah"
+        }
+      }
+    )
+    
+    # Upload to App Store Connect
+    upload_to_app_store(
+      skip_waiting_for_build_processing: true,
+      skip_screenshots: true,
+      skip_metadata: false,
+      submit_for_review: false, # Set to true if you want automatic submission
+      automatic_release: false,
+      force: true
+    )
+  end
+
+  desc "Build for TestFlight"
+  lane :beta do
+    # Increment build number
+    increment_build_number(xcodeproj: "Runner.xcodeproj")
+    
+    # Build the app
+    build_app(
+      scheme: "Runner",
+      workspace: "Runner.xcworkspace",
+      include_bitcode: false,
+      export_method: "app-store"
+    )
+    
+    # Upload to TestFlight
+    upload_to_testflight(
+      skip_waiting_for_build_processing: true
+    )
+  end
+
+  desc "Setup certificates and provisioning profiles"
+  lane :setup_certificates do
+    match(type: "appstore", readonly: false)
+    match(type: "development", readonly: false)
+  end
+end

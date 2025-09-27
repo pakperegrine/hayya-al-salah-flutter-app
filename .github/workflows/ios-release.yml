@@ -1,0 +1,77 @@
+name: iOS Release to App Store
+
+on:
+  push:
+    tags:
+      - 'v*'  # Triggers on version tags like v1.0.0
+  workflow_dispatch:  # Allows manual triggering
+
+jobs:
+  build-and-deploy:
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.24.0'  # Use your Flutter version
+        channel: 'stable'
+        
+    - name: Install dependencies
+      run: flutter pub get
+      
+    - name: Run tests
+      run: flutter test
+      
+    - name: Setup Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: '3.0'
+        bundler-cache: true
+        working-directory: ios
+        
+    - name: Create Gemfile
+      run: |
+        cd ios
+        cat > Gemfile << EOF
+        source "https://rubygems.org"
+        gem "fastlane"
+        EOF
+        bundle install
+        
+    - name: Setup Fastlane
+      run: |
+        cd ios
+        bundle exec fastlane init
+      env:
+        FASTLANE_SKIP_UPDATE_CHECK: true
+        
+    - name: Import Code-Signing Certificates
+      uses: Apple-Actions/import-codesign-certs@v2
+      with:
+        p12-file-base64: ${{ secrets.IOS_DIST_SIGNING_KEY }}
+        p12-password: ${{ secrets.IOS_DIST_SIGNING_KEY_PASSWORD }}
+        
+    - name: Download Provisioning Profiles
+      uses: Apple-Actions/download-provisioning-profiles@v2
+      with:
+        bundle-id: com.pakperegrine.hayya-alal-salah
+        issuer-id: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+        api-key-id: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+        api-private-key: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+        
+    - name: Build Flutter iOS
+      run: |
+        flutter build ios --release --no-codesign
+        
+    - name: Build and Deploy to App Store
+      run: |
+        cd ios
+        bundle exec fastlane release
+      env:
+        FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD: ${{ secrets.FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD }}
+        FASTLANE_SESSION: ${{ secrets.FASTLANE_SESSION }}
+        FASTLANE_USER: ${{ secrets.FASTLANE_USER }}
