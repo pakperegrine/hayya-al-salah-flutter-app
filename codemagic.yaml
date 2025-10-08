@@ -1,0 +1,116 @@
+workflows:
+  ios-workflow:
+    name: iOS Workflow
+    max_build_duration: 120
+    instance_type: mac_mini_m1
+    integrations:
+      app_store_connect: codemagic
+    environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.pakperegrine.hayya-alal-salah
+      flutter: stable
+      groups:
+        - app_store_credentials
+      vars:
+        BUNDLE_ID: "com.pakperegrine.hayya-alal-salah"
+        XCODE_WORKSPACE: "Runner.xcworkspace"
+        XCODE_SCHEME: "Runner"
+        APP_STORE_APPLE_ID: 6446369599  # Your app's Apple ID from App Store Connect
+    scripts:
+      - name: Set up debug keystore
+        script: |
+          set -ex
+          keytool -genkeypair \
+            -alias androiddebugkey \
+            -keypass android \
+            -keystore ~/.android/debug.keystore \
+            -storepass android \
+            -dname "CN=Android Debug,O=Android,C=US" \
+            -validity 365 \
+            -keyalg RSA \
+            -keysize 2048
+            
+      - name: Set up local.properties
+        script: |
+          echo "flutter.sdk=$HOME/programs/flutter" > "$CM_BUILD_DIR/android/local.properties"
+          
+      - name: Get Flutter packages
+        script: |
+          flutter packages pub get
+          
+      - name: Install pods
+        script: |
+          find . -name "Podfile" -execdir pod install \;
+          
+      - name: Flutter analyze
+        script: |
+          flutter analyze || true
+          
+      - name: Flutter test
+        script: |
+          flutter test || true
+          
+      - name: Flutter build ipa
+        script: |
+          flutter build ipa --release \
+            --build-name=2.3.0 \
+            --build-number=$(($(google-cloud-sdk/bin/gsutil ls gs://***/ | wc -l) + 1))
+            
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - flutter_drive.log
+      
+    publishing:
+      email:
+        recipients:
+          - pakperegrine@gmail.com  # Replace with your email
+        notify:
+          success: true
+          failure: true
+          
+      app_store_connect:
+        auth: integration
+        
+        # Configuration for App Store Connect
+        submit_to_testflight: true
+        submit_to_app_store: false  # Set to true when ready for App Store review
+        
+        # Optional: Release notes for TestFlight
+        testflight:
+          groups:
+            - App Store Connect Users
+          
+  android-workflow:
+    name: Android Workflow  
+    max_build_duration: 120
+    instance_type: linux_x2
+    environment:
+      android_signing:
+        - keystore_reference
+      flutter: stable
+      groups:
+        - google_play
+    scripts:
+      - name: Set up local.properties
+        script: |
+          echo "flutter.sdk=$HOME/programs/flutter" > "$CM_BUILD_DIR/android/local.properties"
+          
+      - name: Get Flutter packages
+        script: |
+          flutter packages pub get
+          
+      - name: Build APK with Flutter
+        script: |
+          flutter build apk --release
+          
+    artifacts:
+      - build/app/outputs/**/*.apk
+      - build/app/outputs/**/mapping.txt
+      - flutter_drive.log
+      
+    publishing:
+      email:
+        recipients:
+          - pakperegrine@gmail.com
