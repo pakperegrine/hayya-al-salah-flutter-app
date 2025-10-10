@@ -18,23 +18,6 @@ workflows:
         XCODE_SCHEME: "Runner"
         APP_STORE_APPLE_ID: 6446369599  # Your app's Apple ID from App Store Connect
     scripts:
-      - name: Set up debug keystore
-        script: |
-          set -ex
-          keytool -genkeypair \
-            -alias androiddebugkey \
-            -keypass android \
-            -keystore ~/.android/debug.keystore \
-            -storepass android \
-            -dname "CN=Android Debug,O=Android,C=US" \
-            -validity 365 \
-            -keyalg RSA \
-            -keysize 2048
-            
-      - name: Set up local.properties
-        script: |
-          echo "flutter.sdk=$HOME/programs/flutter" > "$CM_BUILD_DIR/android/local.properties"
-          
       - name: Get Flutter packages
         script: |
           flutter packages pub get
@@ -54,8 +37,8 @@ workflows:
       - name: Flutter build ipa
         script: |
           flutter build ipa --release \
-            --build-name=2.3.0 \
-            --build-number=$(($(google-cloud-sdk/bin/gsutil ls gs://***/ | wc -l) + 1))
+            --build-name=2.4.0 \
+            --build-number=$BUILD_NUMBER
             
     artifacts:
       - build/ios/ipa/*.ipa
@@ -93,6 +76,19 @@ workflows:
       groups:
         - google_play
     scripts:
+      - name: Set up debug keystore
+        script: |
+          set -ex
+          keytool -genkeypair \
+            -alias androiddebugkey \
+            -keypass android \
+            -keystore ~/.android/debug.keystore \
+            -storepass android \
+            -dname "CN=Android Debug,O=Android,C=US" \
+            -validity 365 \
+            -keyalg RSA \
+            -keysize 2048
+            
       - name: Set up local.properties
         script: |
           echo "flutter.sdk=$HOME/programs/flutter" > "$CM_BUILD_DIR/android/local.properties"
