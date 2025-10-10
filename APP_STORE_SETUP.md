@@ -102,3 +102,5 @@ For more details, visit:
 - [GitHub Actions for iOS](https://github.com/Apple-Actions)
 
 Apple Distribution Certicate .p12 password: Naeem123*
+Fastlane user: fastlane2
+password: lwiz-uvgq-nkms-zewh
