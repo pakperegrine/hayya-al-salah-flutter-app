@@ -48,22 +48,27 @@ workflows:
     publishing:
       email:
         recipients:
-          - pakperegrine@gmail.com  # Replace with your email
+          - pakperegrine@gmail.com
         notify:
           success: true
           failure: true
-          
+
       app_store_connect:
         auth: integration
-        
-        # Configuration for App Store Connect
+
+        # TestFlight (optional but recommended)
         submit_to_testflight: true
-        submit_to_app_store: false  # Set to true when ready for App Store review
-        
-        # Optional: Release notes for TestFlight
-        testflight:
-          groups:
-            - App Store Connect Users
+        beta_groups:
+          - "App Store Connect Users"     # change if your group name differs
+        expire_build_submitted_for_review: true
+
+        # App Store submission
+        submit_to_app_store: true
+        cancel_previous_submissions: true
+        release_type: AFTER_APPROVAL      # MANUAL | AFTER_APPROVAL | SCHEDULED
+        # earliest_release_date: 2025-10-10T17:00:00+05:00  # only if release_type=SCHEDULED
+        phased_release: false
+        # copyright: "2025 Medhouse Group"
           
   android-workflow:
     name: Android Workflow  
