@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/notification.dart';
 import '../services/api_service.dart';
+import '../services/app_localizations.dart';
 import 'notification_detail_page.dart';
 
 class NotificationScreen extends StatefulWidget {
@@ -194,10 +195,12 @@ class _NotificationScreenState extends State<NotificationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final localizations = AppLocalizations.of(context);
+
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        title: const Text('Notifications'),
+        title: Text(localizations.notifications),
         backgroundColor: const Color(0xFF23514C),
         foregroundColor: Colors.white,
         actions: [
@@ -215,8 +218,8 @@ class _NotificationScreenState extends State<NotificationScreen> {
                   });
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                          content: Text('All notifications marked as read')),
+                      SnackBar(
+                          content: Text(localizations.allNotificationsRead)),
                     );
                   }
                 } catch (e) {

@@ -3,6 +3,8 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../models/topic.dart';
 import '../services/api_service.dart';
+import '../services/app_localizations.dart';
+import '../services/favorites_service.dart';
 import 'lesson_detail_screen.dart';
 
 class TopicsScreen extends StatefulWidget {
@@ -15,6 +17,7 @@ class TopicsScreen extends StatefulWidget {
 class _TopicsScreenState extends State<TopicsScreen> {
   final TextEditingController _searchController = TextEditingController();
   final ApiService _apiService = ApiService();
+  final FavoritesService _favoritesService = FavoritesService.instance;
   List<Topic> _filteredTopics = [];
   List<Topic> _allTopics = [];
   bool _isLoading = false;
@@ -78,11 +81,13 @@ class _TopicsScreenState extends State<TopicsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final localizations = AppLocalizations.of(context);
+
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
         title: Text(
-          'Islamic Topics',
+          localizations.topics,
           style: GoogleFonts.inter(fontWeight: FontWeight.w600),
         ),
         backgroundColor: const Color(0xFF23514C),
@@ -96,7 +101,7 @@ class _TopicsScreenState extends State<TopicsScreen> {
               controller: _searchController,
               onChanged: _filterTopics,
               decoration: InputDecoration(
-                hintText: 'Search topics...',
+                hintText: localizations.searchTopics,
                 prefixIcon: const Icon(Icons.search),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),

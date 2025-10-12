@@ -1,10 +1,16 @@
+import 'dart:io';
+
 import 'package:chewie/chewie.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 
 import '../models/topic.dart';
 import '../services/favorites_service.dart';
+import '../services/offline_video_service.dart';
+import '../services/settings_service.dart';
 
 class VideoPlayerScreen extends StatefulWidget {
   final Lesson lesson;
@@ -143,22 +149,58 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
   void _initializePlayer() async {
     try {
-      // Initialize video player with the lesson's video URL
-      print('Initializing video: ${widget.lesson.videoUrl}');
+      final offlineService = OfflineVideoService.instance;
+      String videoUrl = widget.lesson.videoUrl;
 
-      _videoController = VideoPlayerController.networkUrl(
-        Uri.parse(widget.lesson.videoUrl),
-        httpHeaders: {
-          'User-Agent':
-              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        },
-      );
+      // Check if video is available offline
+      final localPath =
+          await offlineService.getLocalVideoPath(widget.lesson.id);
+      if (localPath != null) {
+        print('Playing offline video: $localPath');
+
+        // Verify file exists and is accessible before using it
+        final file = File(localPath);
+        if (await file.exists()) {
+          try {
+            final fileSize = await file.length();
+            print('Offline video file size: $fileSize bytes');
+
+            if (fileSize > 0) {
+              _videoController = VideoPlayerController.file(file);
+            } else {
+              print('Offline video file is empty, falling back to online');
+              throw Exception('Offline video file is empty');
+            }
+          } catch (e) {
+            print('Error accessing offline video file: $e');
+            throw Exception('Cannot access offline video file');
+          }
+        } else {
+          print('Offline video file does not exist, falling back to online');
+          throw Exception('Offline video file not found');
+        }
+      } else {
+        print('No offline video available, playing online video: $videoUrl');
+        _videoController = VideoPlayerController.networkUrl(
+          Uri.parse(videoUrl),
+          httpHeaders: {
+            'User-Agent':
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          },
+        );
+      }
 
       await _videoController!.initialize();
 
+      // Add listener for video completion to handle autoplay
+      _videoController!.addListener(_videoPlayerListener);
+
+      final settingsService =
+          Provider.of<SettingsService>(context, listen: false);
+
       _chewieController = ChewieController(
         videoPlayerController: _videoController!,
-        autoPlay: false,
+        autoPlay: settingsService.autoPlayEnabled,
         looping: false,
         aspectRatio: _videoController!.value.aspectRatio,
         materialProgressColors: ChewieProgressColors(
@@ -218,6 +260,64 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       }
     } catch (error) {
       print('Video initialization error: $error');
+
+      // If offline video failed, try to fallback to online video
+      if (error.toString().contains('offline') ||
+          error.toString().contains('file')) {
+        try {
+          print(
+              'Attempting fallback to online video: ${widget.lesson.videoUrl}');
+          _videoController?.dispose();
+
+          _videoController = VideoPlayerController.networkUrl(
+            Uri.parse(widget.lesson.videoUrl),
+            httpHeaders: {
+              'User-Agent':
+                  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            },
+          );
+
+          await _videoController!.initialize();
+          _videoController!.addListener(_videoPlayerListener);
+
+          final settingsService =
+              Provider.of<SettingsService>(context, listen: false);
+
+          _chewieController = ChewieController(
+            videoPlayerController: _videoController!,
+            autoPlay: settingsService.autoPlayEnabled,
+            looping: false,
+            aspectRatio: _videoController!.value.aspectRatio,
+            materialProgressColors: ChewieProgressColors(
+              playedColor: const Color(0xFF23514C),
+              handleColor: const Color(0xFF23514C),
+              backgroundColor: Colors.grey,
+              bufferedColor: Colors.grey[300]!,
+            ),
+          );
+
+          if (mounted) {
+            setState(() {
+              _isPlayerReady = true;
+            });
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Offline video failed, playing online version'),
+                backgroundColor: Colors.orange,
+              ),
+            );
+          }
+
+          // Clean up corrupted offline file
+          final offlineService = OfflineVideoService.instance;
+          await offlineService.deleteDownloadedLesson(widget.lesson.id);
+
+          return;
+        } catch (fallbackError) {
+          print('Fallback to online video also failed: $fallbackError');
+        }
+      }
+
       if (mounted) {
         setState(() {
           _isPlayerReady = false;
@@ -232,8 +332,150 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     }
   }
 
+  // Add listener for video completion to handle autoplay
+  void _videoPlayerListener() async {
+    if (_videoController != null && _videoController!.value.isInitialized) {
+      final duration = _videoController!.value.duration;
+      final position = _videoController!.value.position;
+
+      // Check if video has finished playing (within 1 second of completion)
+      if (duration.inSeconds > 0 &&
+          (position.inSeconds >= duration.inSeconds - 1) &&
+          !_videoController!.value.isPlaying) {
+        await _handleVideoCompletion();
+      }
+    }
+  }
+
+  Future<void> _handleVideoCompletion() async {
+    final settingsService =
+        Provider.of<SettingsService>(context, listen: false);
+
+    // Check if autoplay is enabled
+    if (!settingsService.autoPlayEnabled) {
+      return;
+    }
+
+    // Find next lesson from related videos with same lesson number
+    final nextLesson = _findNextLesson();
+
+    if (nextLesson != null) {
+      // Show autoplay countdown dialog
+      final shouldAutoplay = await _showAutoplayDialog(nextLesson);
+
+      if (shouldAutoplay && mounted) {
+        // Navigate to next lesson
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => VideoPlayerScreen(
+              lesson: nextLesson,
+              relatedLessons: widget.relatedLessons,
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  Lesson? _findNextLesson() {
+    // Filter related lessons with same lesson number, excluding current lesson
+    final sameLessonVideos = widget.relatedLessons
+        .where((lesson) =>
+            lesson.id != widget.lesson.id &&
+            lesson.lessonNumber == widget.lesson.lessonNumber)
+        .toList();
+
+    if (sameLessonVideos.isEmpty) {
+      return null;
+    }
+
+    // Sort by title or ID to get consistent ordering
+    sameLessonVideos.sort((a, b) => a.title.compareTo(b.title));
+
+    // Return the first one (you can implement more sophisticated logic here)
+    return sameLessonVideos.first;
+  }
+
+  Future<bool> _showAutoplayDialog(Lesson nextLesson) async {
+    int countdown = 5;
+    bool shouldAutoplay = true;
+
+    return await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => StatefulBuilder(
+            builder: (context, setState) {
+              // Start countdown timer
+              if (countdown > 0) {
+                Future.delayed(const Duration(seconds: 1), () {
+                  if (mounted && countdown > 0) {
+                    setState(() {
+                      countdown--;
+                    });
+                    if (countdown == 0 && shouldAutoplay) {
+                      Navigator.of(context).pop(true);
+                    }
+                  }
+                });
+              }
+
+              return AlertDialog(
+                title: const Text('Autoplay Next Lesson'),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('Next lesson will start in:'),
+                    const SizedBox(height: 16),
+                    Text(
+                      '$countdown',
+                      style: const TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF23514C),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    buildUnicodeText(
+                      nextLesson.title,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () {
+                      shouldAutoplay = false;
+                      Navigator.of(context).pop(false);
+                    },
+                    child: const Text('Cancel'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () {
+                      Navigator.of(context).pop(true);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF23514C),
+                      foregroundColor: Colors.white,
+                    ),
+                    child: const Text('Play Now'),
+                  ),
+                ],
+              );
+            },
+          ),
+        ) ??
+        false;
+  }
+
   @override
   void dispose() {
+    _videoController?.removeListener(_videoPlayerListener);
     _chewieController?.dispose();
     _videoController?.dispose();
     super.dispose();
@@ -255,14 +497,12 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
           ),
         ),
         actions: [
-          if (widget.lesson.referenceFileUrl != null)
-            IconButton(
-              icon: const Icon(Icons.download, color: Colors.white),
-              onPressed: _downloadReference,
+          Padding(
+            padding: const EdgeInsets.only(right: 8.0),
+            child: IconButton(
+              icon: const Icon(Icons.share, color: Colors.white),
+              onPressed: _shareLesson,
             ),
-          IconButton(
-            icon: const Icon(Icons.share, color: Colors.white),
-            onPressed: _shareLesson,
           ),
         ],
       ),
@@ -461,13 +701,52 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Related Lessons (Lesson ${widget.lesson.lessonNumber})',
-            style: GoogleFonts.inter(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: Colors.black87,
-            ),
+          Row(
+            children: [
+              Text(
+                'Related Lessons (Lesson ${widget.lesson.lessonNumber})',
+                style: GoogleFonts.inter(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
+                ),
+              ),
+              const Spacer(),
+              Consumer<SettingsService>(
+                builder: (context, settings, child) {
+                  if (settings.autoPlayEnabled && filteredLessons.isNotEmpty) {
+                    return Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF23514C).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.play_arrow,
+                            size: 16,
+                            color: const Color(0xFF23514C),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Autoplay',
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              color: const Color(0xFF23514C),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                  return const SizedBox.shrink();
+                },
+              ),
+            ],
           ),
           const SizedBox(height: 16),
           Expanded(
@@ -487,7 +766,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                         .clamp(0, 5), // Show max 5 related lessons
                     itemBuilder: (context, index) {
                       final lesson = filteredLessons[index];
-                      return _buildRelatedLessonCard(lesson);
+                      final isNext =
+                          index == 0; // First lesson will be next for autoplay
+                      return _buildRelatedLessonCard(lesson, isNext);
                     },
                   ),
           ),
@@ -496,13 +777,16 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     );
   }
 
-  Widget _buildRelatedLessonCard(Lesson lesson) {
+  Widget _buildRelatedLessonCard(Lesson lesson, [bool isNext = false]) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: Colors.grey[50],
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey[200]!),
+        border: Border.all(
+          color: isNext ? const Color(0xFF23514C) : Colors.grey[200]!,
+          width: isNext ? 2 : 1,
+        ),
       ),
       child: InkWell(
         onTap: () {
@@ -529,11 +813,39 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                   color: const Color(0xFF23514C),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(
-                  Icons.play_arrow,
-                  color: Colors.white,
-                  size: 24,
-                ),
+                child: isNext
+                    ? Stack(
+                        children: [
+                          const Center(
+                            child: Icon(
+                              Icons.play_arrow,
+                              color: Colors.white,
+                              size: 24,
+                            ),
+                          ),
+                          Positioned(
+                            top: 2,
+                            right: 2,
+                            child: Container(
+                              padding: const EdgeInsets.all(2),
+                              decoration: const BoxDecoration(
+                                color: Colors.orange,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.skip_next,
+                                color: Colors.white,
+                                size: 12,
+                              ),
+                            ),
+                          ),
+                        ],
+                      )
+                    : const Icon(
+                        Icons.play_arrow,
+                        color: Colors.white,
+                        size: 24,
+                      ),
               ),
 
               const SizedBox(width: 12),
@@ -543,15 +855,42 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    buildUnicodeText(
-                      lesson.title,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.black87,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                    Row(
+                      children: [
+                        Expanded(
+                          child: buildUnicodeText(
+                            lesson.title,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: isNext
+                                  ? const Color(0xFF23514C)
+                                  : Colors.black87,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (isNext) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.orange,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              'Next',
+                              style: GoogleFonts.inter(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -571,13 +910,62 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     );
   }
 
-  void _downloadReference() {
-    // Implement reference file download
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Downloading reference material...'),
-        backgroundColor: Color(0xFF23514C),
-      ),
+  Future<void> _downloadReference() async {
+    if (widget.lesson.referenceFileUrl == null ||
+        widget.lesson.referenceFileUrl!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No reference material available'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    try {
+      // Extract filename from URL or create a default one
+      final uri = Uri.parse(widget.lesson.referenceFileUrl!);
+      String fileName = uri.pathSegments.isNotEmpty
+          ? uri.pathSegments.last
+          : 'reference_material_${widget.lesson.id}.pdf';
+
+      // If no extension in filename, add .pdf as default
+      if (!fileName.contains('.')) {
+        fileName = '$fileName.pdf';
+      }
+
+      print('Downloading reference: ${widget.lesson.referenceFileUrl!}');
+      print('Filename: $fileName');
+
+      // Use the new download method
+      await _downloadFile(widget.lesson.referenceFileUrl!, fileName);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Opening reference material: ${widget.lesson.title}'),
+            backgroundColor: const Color(0xFF23514C),
+          ),
+        );
+      }
+    } catch (e) {
+      print('Error downloading reference: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to open reference material'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _downloadFile(String url, String fileName) async {
+    final Uri uri = Uri.parse(url);
+    await launchUrl(
+      uri,
+      mode: LaunchMode.externalApplication,
     );
   }
 

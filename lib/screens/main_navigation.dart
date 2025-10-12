@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../services/app_localizations.dart';
 import 'favorites_screen.dart';
 import 'home_screen.dart';
 import 'manage_screen.dart';
@@ -24,6 +25,8 @@ class _MainNavigationState extends State<MainNavigation> {
 
   @override
   Widget build(BuildContext context) {
+    final localizations = AppLocalizations.of(context);
+
     return Scaffold(
       body: IndexedStack(
         index: _currentIndex,
@@ -52,26 +55,26 @@ class _MainNavigationState extends State<MainNavigation> {
           unselectedItemColor: Colors.grey[600],
           selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600),
           elevation: 0,
-          items: const [
+          items: [
             BottomNavigationBarItem(
-              icon: Icon(Icons.home_outlined),
-              activeIcon: Icon(Icons.home),
-              label: 'Home',
+              icon: const Icon(Icons.home_outlined),
+              activeIcon: const Icon(Icons.home),
+              label: localizations.home,
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.library_books_outlined),
-              activeIcon: Icon(Icons.library_books),
-              label: 'Topics',
+              icon: const Icon(Icons.library_books_outlined),
+              activeIcon: const Icon(Icons.library_books),
+              label: localizations.topics,
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.favorite_outline),
-              activeIcon: Icon(Icons.favorite),
-              label: 'Favorites',
+              icon: const Icon(Icons.favorite_outline),
+              activeIcon: const Icon(Icons.favorite),
+              label: localizations.favorites,
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.settings_outlined),
-              activeIcon: Icon(Icons.settings),
-              label: 'Manage',
+              icon: const Icon(Icons.settings_outlined),
+              activeIcon: const Icon(Icons.settings),
+              label: localizations.manage,
             ),
           ],
         ),

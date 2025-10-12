@@ -1,8 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../models/topic.dart';
 import '../services/api_service.dart';
+import '../services/app_localizations.dart';
+import '../services/favorites_service.dart';
+import '../services/offline_video_service.dart';
+import '../services/settings_service.dart';
 import 'video_player_screen.dart';
 
 class LessonDetailScreen extends StatefulWidget {
@@ -20,10 +26,14 @@ class LessonDetailScreen extends StatefulWidget {
 class _LessonDetailScreenState extends State<LessonDetailScreen> {
   final TextEditingController _searchController = TextEditingController();
   final ApiService _apiService = ApiService();
+  final FavoritesService _favoritesService = FavoritesService.instance;
+  final OfflineVideoService _offlineService = OfflineVideoService.instance;
 
   List<Lesson> _filteredLessons = [];
   List<Lesson> _allLessons = [];
   bool _isLoadingLessons = false;
+  final Map<String, bool> _downloadingLessons = {};
+  final Map<String, double> _downloadProgress = {};
 
   @override
   void initState() {
@@ -476,18 +486,26 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> {
                         ),
                         if (lesson.referenceFileUrl != null) ...[
                           const SizedBox(width: 16),
-                          Icon(
-                            Icons.attach_file,
-                            size: 16,
-                            color: Theme.of(context).textTheme.bodySmall?.color,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Reference',
-                            style: GoogleFonts.inter(
-                              fontSize: 12,
-                              color:
-                                  Theme.of(context).textTheme.bodySmall?.color,
+                          GestureDetector(
+                            onTap: () => _downloadReference(lesson),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.download,
+                                  size: 16,
+                                  color: Theme.of(context).primaryColor,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Reference',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    color: Theme.of(context).primaryColor,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
@@ -497,19 +515,111 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> {
                 ),
               ),
 
-              // Play Button
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: Theme.of(context).primaryColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Icon(
-                  Icons.play_arrow,
-                  color: Theme.of(context).primaryColor,
-                  size: 24,
-                ),
+              // Action Buttons
+              Column(
+                children: [
+                  // Favorite Button
+                  FutureBuilder<bool>(
+                    future: _favoritesService.isFavorite(lesson.id),
+                    builder: (context, snapshot) {
+                      final isFavorite = snapshot.data ?? false;
+                      return IconButton(
+                        onPressed: () => _toggleFavorite(lesson),
+                        icon: Icon(
+                          isFavorite ? Icons.favorite : Icons.favorite_border,
+                          color:
+                              isFavorite ? Colors.red[400] : Colors.grey[600],
+                          size: 20,
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 32,
+                          minHeight: 32,
+                        ),
+                        padding: EdgeInsets.zero,
+                      );
+                    },
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  // Download Button
+                  Consumer<SettingsService>(
+                    builder: (context, settingsService, child) {
+                      if (!settingsService.offlineVideosEnabled) {
+                        return const SizedBox.shrink();
+                      }
+
+                      return FutureBuilder<bool>(
+                        future: _offlineService.isLessonDownloaded(lesson.id),
+                        builder: (context, snapshot) {
+                          final isDownloaded = snapshot.data ?? false;
+                          final isDownloading =
+                              _downloadingLessons[lesson.id] ?? false;
+                          final progress = _downloadProgress[lesson.id] ?? 0.0;
+
+                          if (isDownloading) {
+                            return SizedBox(
+                              width: 32,
+                              height: 32,
+                              child: Stack(
+                                alignment: Alignment.center,
+                                children: [
+                                  CircularProgressIndicator(
+                                    value: progress,
+                                    strokeWidth: 2,
+                                    color: Theme.of(context).primaryColor,
+                                  ),
+                                  Text(
+                                    '${(progress * 100).toInt()}%',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 8,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }
+
+                          return IconButton(
+                            onPressed: isDownloaded
+                                ? () => _deleteDownloadedLesson(lesson)
+                                : () => _downloadLesson(lesson),
+                            icon: Icon(
+                              isDownloaded
+                                  ? Icons.download_done
+                                  : Icons.download_outlined,
+                              color: isDownloaded
+                                  ? Colors.green
+                                  : Theme.of(context).primaryColor,
+                              size: 20,
+                            ),
+                            constraints: const BoxConstraints(
+                              minWidth: 32,
+                              minHeight: 32,
+                            ),
+                            padding: EdgeInsets.zero,
+                          );
+                        },
+                      );
+                    },
+                  ),
+
+                  // Play Button
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).primaryColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Icon(
+                      Icons.play_arrow,
+                      color: Theme.of(context).primaryColor,
+                      size: 24,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -586,5 +696,209 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> {
       '25:40'
     ];
     return durations[index % durations.length];
+  }
+
+  Future<void> _toggleFavorite(Lesson lesson) async {
+    try {
+      final isFavorite = await _favoritesService.isFavorite(lesson.id);
+      bool success;
+
+      if (isFavorite) {
+        success = await _favoritesService.removeFromFavorites(lesson.id);
+        if (success && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Removed from favorites'),
+              backgroundColor: Color(0xFF23514C),
+            ),
+          );
+        }
+      } else {
+        success = await _favoritesService.addToFavorites(lesson);
+        if (success && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Added to favorites'),
+              backgroundColor: Color(0xFF23514C),
+            ),
+          );
+        }
+      }
+
+      // Trigger rebuild to update the favorite icon
+      if (mounted) {
+        setState(() {});
+      }
+    } catch (e) {
+      print('Error toggling favorite: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to update favorites'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _downloadReference(Lesson lesson) async {
+    if (lesson.referenceFileUrl == null || lesson.referenceFileUrl!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No reference material available'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    try {
+      // Extract filename from URL or create a default one
+      final uri = Uri.parse(lesson.referenceFileUrl!);
+      String fileName = uri.pathSegments.isNotEmpty
+          ? uri.pathSegments.last
+          : 'reference_material_${lesson.id}.pdf';
+
+      // If no extension in filename, add .pdf as default
+      if (!fileName.contains('.')) {
+        fileName = '$fileName.pdf';
+      }
+
+      print('Downloading reference: ${lesson.referenceFileUrl!}');
+      print('Filename: $fileName');
+
+      // Use the new download method
+      await _downloadFile(lesson.referenceFileUrl!, fileName);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Opening reference material: ${lesson.title}'),
+            backgroundColor: const Color(0xFF23514C),
+          ),
+        );
+      }
+    } catch (e) {
+      print('Error downloading reference: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to open reference material'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _downloadFile(String url, String fileName) async {
+    final Uri uri = Uri.parse(url);
+    await launchUrl(
+      uri,
+      mode: LaunchMode.externalApplication,
+    );
+  }
+
+  Future<void> _downloadLesson(Lesson lesson) async {
+    final localizations = AppLocalizations.of(context);
+    final settingsService =
+        Provider.of<SettingsService>(context, listen: false);
+
+    if (!settingsService.offlineVideosEnabled) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(localizations.offlineVideosDesc),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    // Check if already downloaded
+    if (await _offlineService.isLessonDownloaded(lesson.id)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(localizations.downloaded),
+          backgroundColor: Colors.green,
+        ),
+      );
+      return;
+    }
+
+    // Start download
+    setState(() {
+      _downloadingLessons[lesson.id] = true;
+      _downloadProgress[lesson.id] = 0.0;
+    });
+
+    final success = await _offlineService.downloadLesson(
+      lesson,
+      onProgress: (progress) {
+        setState(() {
+          _downloadProgress[lesson.id] = progress;
+        });
+      },
+      onError: (error) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${localizations.downloadFailed}: $error'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      },
+    );
+
+    setState(() {
+      _downloadingLessons[lesson.id] = false;
+      _downloadProgress.remove(lesson.id);
+    });
+
+    if (success && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(localizations.downloadCompleted),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
+  }
+
+  Future<void> _deleteDownloadedLesson(Lesson lesson) async {
+    final localizations = AppLocalizations.of(context);
+
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(localizations.deleteDownload),
+        content: Text(localizations.deleteDownloadConfirmation),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(localizations.cancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: Text(localizations.delete),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldDelete == true) {
+      final success = await _offlineService.deleteDownloadedLesson(lesson.id);
+      if (success && mounted) {
+        setState(() {}); // Refresh UI
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(localizations.videoDeletedSuccessfully),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    }
   }
 }
