@@ -7,7 +7,12 @@ import UIKit
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
-    GeneratedPluginRegistrant.register(with: self)
+    // Add error handling for plugin registration
+    do {
+      GeneratedPluginRegistrant.register(with: self)
+    } catch {
+      print("Error registering plugins: \(error)")
+    }
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 }
