@@ -6,8 +6,14 @@ class AppLocalizations {
   AppLocalizations(this.locale);
 
   static AppLocalizations of(BuildContext context) {
-    return Localizations.of<AppLocalizations>(context, AppLocalizations) ??
-        AppLocalizations(const Locale('en', 'US'));
+    try {
+      return Localizations.of<AppLocalizations>(context, AppLocalizations) ??
+          AppLocalizations(const Locale('en', 'US'));
+    } catch (e) {
+      print('Localization error: $e');
+      // Return fallback localization
+      return AppLocalizations(const Locale('en', 'US'));
+    }
   }
 
   static const LocalizationsDelegate<AppLocalizations> delegate =

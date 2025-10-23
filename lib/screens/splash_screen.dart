@@ -17,48 +17,77 @@ class _SplashScreenState extends State<SplashScreen>
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
+  bool _isDisposed = false;
 
   @override
   void initState() {
     super.initState();
-    _animationController = AnimationController(
-      duration: const Duration(seconds: 2),
-      vsync: this,
-    );
+    
+    try {
+      _animationController = AnimationController(
+        duration: const Duration(seconds: 2),
+        vsync: this,
+      );
 
-    _fadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeIn,
-    ));
+      _fadeAnimation = Tween<double>(
+        begin: 0.0,
+        end: 1.0,
+      ).animate(CurvedAnimation(
+        parent: _animationController,
+        curve: Curves.easeIn,
+      ));
 
-    _scaleAnimation = Tween<double>(
-      begin: 0.5,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.elasticOut,
-    ));
+      _scaleAnimation = Tween<double>(
+        begin: 0.5,
+        end: 1.0,
+      ).animate(CurvedAnimation(
+        parent: _animationController,
+        curve: Curves.elasticOut,
+      ));
 
-    _animationController.forward();
+      _animationController.forward();
 
-    // Navigate to main screen after 3 seconds
-    Future.delayed(const Duration(seconds: 3), () {
-      if (mounted) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (context) => const MainNavigation(),
-          ),
-        );
-      }
-    });
+      // Navigate to main screen after 3 seconds with error handling
+      Future.delayed(const Duration(seconds: 3), () {
+        if (mounted && !_isDisposed) {
+          try {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (context) => const MainNavigation(),
+              ),
+            );
+          } catch (e) {
+            print('Navigation error: $e');
+          }
+        }
+      });
+    } catch (e) {
+      print('Splash screen initialization error: $e');
+      // Fallback navigation
+      Future.delayed(const Duration(seconds: 1), () {
+        if (mounted && !_isDisposed) {
+          try {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (context) => const MainNavigation(),
+              ),
+            );
+          } catch (e) {
+            print('Fallback navigation error: $e');
+          }
+        }
+      });
+    }
   }
 
   @override
   void dispose() {
-    _animationController.dispose();
+    _isDisposed = true;
+    try {
+      _animationController.dispose();
+    } catch (e) {
+      print('Animation controller dispose error: $e');
+    }
     super.dispose();
   }
 

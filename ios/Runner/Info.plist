@@ -52,5 +52,19 @@
 		</dict>
 		<key>UIStatusBarHidden</key>
 		<false/>
-	</dict>
+		<key>UIViewControllerBasedStatusBarAppearance</key>
+		<true/>
+	<key>UIRequiresFullScreen</key>
+	<false/>
+	<key>UISupportsDocumentBrowser</key>
+	<false/>
+	<key>FLTEnableImpeller</key>
+	<false/>
+	<key>CADisableMinimumFrameDurationOnPhone</key>
+	<true/>
+	<key>UIApplicationSupportsIndirectInputEvents</key>
+	<true/>
+	<key>io.flutter.embedded_views_preview</key>
+	<true/>
+</dict>
 </plist>

@@ -25,6 +25,7 @@ class _MainNavigationState extends State<MainNavigation> {
 
   @override
   Widget build(BuildContext context) {
+    // Safer localization access with fallback
     final localizations = AppLocalizations.of(context);
 
     return Scaffold(

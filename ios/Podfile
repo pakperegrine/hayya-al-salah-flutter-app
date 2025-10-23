@@ -1,5 +1,5 @@
 # Uncomment this line to define a global platform for your project
-platform :ios, '13.0'
+platform :ios, '14.0'
 
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
@@ -40,5 +40,25 @@ end
 post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
+    
+    # Add iOS 18.0+ compatibility fixes
+    target.build_configurations.each do |config|
+      # Ensure minimum deployment target
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'
+      
+      # Add Metal performance optimization
+      config.build_settings['MTL_ENABLE_DEBUG_INFO'] = 'NO'
+      config.build_settings['ENABLE_BITCODE'] = 'NO'
+      
+      # Fix potential memory issues
+      config.build_settings['GCC_OPTIMIZATION_LEVEL'] = '0'
+      config.build_settings['SWIFT_OPTIMIZATION_LEVEL'] = '-Onone'
+      
+      # Disable problematic features for iOS 18
+      if config.name == 'Debug'
+        config.build_settings['OTHER_SWIFT_FLAGS'] = '$(inherited) -DDEBUG'
+        config.build_settings['SWIFT_ACTIVE_COMPILATION_CONDITIONS'] = 'DEBUG'
+      end
+    end
   end
 end
