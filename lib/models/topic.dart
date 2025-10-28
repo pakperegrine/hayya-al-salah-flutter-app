@@ -5,6 +5,7 @@ class Topic {
   final String imageUrl;
   final int lessonsCount;
   final String duration;
+  final String action;
   final List<Lesson> lessons;
 
   Topic({
@@ -15,6 +16,7 @@ class Topic {
     required this.lessonsCount,
     required this.duration,
     required this.lessons,
+    required this.action ,
   });
 
   factory Topic.fromJson(Map<String, dynamic> json) {
@@ -25,6 +27,7 @@ class Topic {
       imageUrl: json['image_url'] ?? '',
       lessonsCount: json['lessons_count'] ?? 0,
       duration: json['duration'] ?? '',
+      action: json['action'] ?? '',
       lessons: (json['lessons'] as List<dynamic>?)
               ?.map((lessonJson) => Lesson.fromJson(lessonJson))
               .toList() ??
@@ -41,6 +44,7 @@ class Topic {
       imageUrl: json['image_url'] ?? '',
       lessonsCount: json['lessons_count'] ?? 0,
       duration: json['duration'] ?? '',
+      action: json['action'] ?? '',
       lessons: (json['lessons'] as List<dynamic>?)
               ?.map((lessonJson) => Lesson.fromApiJson(lessonJson))
               .toList() ??

@@ -66,5 +66,11 @@
 	<true/>
 	<key>io.flutter.embedded_views_preview</key>
 	<true/>
+	<key>UIRequiredDeviceCapabilities</key>
+	<array>
+		<string>arm64</string>
+	</array>
+	<key>LSRequiresIPhoneOS</key>
+	<false/>
 </dict>
 </plist>

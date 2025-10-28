@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../data/topics_data.dart';
 import '../models/quran_verse.dart';
 import '../models/topic.dart';
 import '../services/api_service.dart';
 import '../services/islamic_calendar_service.dart';
 import '../services/quran_api_service.dart';
 import 'lesson_detail_screen.dart';
+import 'prayer_animation_screen.dart';
 import 'notification_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -24,16 +26,16 @@ class _HomeScreenState extends State<HomeScreen> {
   QuranVerse? _currentVerse;
   bool _isLoadingVerse = true;
   Map<String, String> _currentDate = {};
-  List<Topic> _topics = [];
-  bool _isLoadingTopics = false;
   int _notificationCount = 0;
+
+  // Static list of topics
+  final List<Topic> _topics = topicsData;
 
   @override
   void initState() {
     super.initState();
     _loadCurrentDate();
     _loadRandomVerse();
-    _loadTopics();
     _loadNotificationCount();
   }
 
@@ -64,30 +66,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _loadTopics() async {
-    setState(() {
-      _isLoadingTopics = true;
-    });
-
-    try {
-      await _apiService.initialize();
-      final topics = await _apiService.getTopics();
-      setState(() {
-        _topics = topics.isNotEmpty ? topics : _getSampleTopics();
-        _isLoadingTopics = false;
-      });
-    } catch (e) {
-      setState(() {
-        _topics = _getSampleTopics(); // Fallback to sample data
-        _isLoadingTopics = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Failed to load topics, showing sample data')),
-      );
-    }
-  }
-
   Future<void> _loadNotificationCount() async {
     try {
       await _apiService.initialize();
@@ -99,30 +77,6 @@ class _HomeScreenState extends State<HomeScreen> {
       print('Failed to load notification count: $e');
       // Keep default count of 0
     }
-  }
-
-  // Fallback sample topics if API fails
-  List<Topic> _getSampleTopics() {
-    return [
-      Topic(
-        id: '1',
-        title: 'Salah Lessons',
-        description: 'By Dr. Farhat Hashmi',
-        imageUrl: '',
-        lessonsCount: 80,
-        duration: '2 hours',
-        lessons: [],
-      ),
-      Topic(
-        id: '2',
-        title: 'Salah Guide',
-        description: 'Step by Step Salah guide',
-        imageUrl: '',
-        lessonsCount: 12,
-        duration: '3 hours',
-        lessons: [],
-      ),
-    ];
   }
 
   @override
@@ -199,7 +153,6 @@ class _HomeScreenState extends State<HomeScreen> {
         onRefresh: () async {
           _loadCurrentDate();
           await _loadRandomVerse();
-          await _loadTopics();
         },
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -441,23 +394,17 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          _isLoadingTopics
-              ? const Center(
-                  child: CircularProgressIndicator(
-                    color: Color(0xFF23514C),
-                  ),
-                )
-              : SizedBox(
-                  height: 220, // Reduced height from 250 to 220
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: _topics
-                          .map((topic) => _buildTopicCard(topic))
-                          .toList(),
-                    ),
-                  ),
-                ),
+          SizedBox(
+            height: 220, // Reduced height from 250 to 220
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: _topics
+                    .map((topic) => _buildTopicCard(topic))
+                    .toList(),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -480,12 +427,22 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       child: InkWell(
         onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => LessonDetailScreen(topic: topic),
-            ),
-          );
+
+          if (topic.action == 'lectures') {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => LessonDetailScreen(topic: topic),
+              ),
+            );
+          } else if (topic.action == 'prayer') {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => PrayerAnimationScreen(topic: topic),
+              ),
+            );
+          }
         },
         borderRadius: BorderRadius.circular(12),
         child: Column(
@@ -538,7 +495,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     const SizedBox(height: 8), // Fixed spacing
                     Text(
-                      '${topic.lessonsCount} lessons',
+                      '${topic.lessonsCount} ${topic.action == 'lectures' ? 'lessons' : 'slides'}',
                       style: GoogleFonts.inter(
                         fontSize: 11,
                         color: Colors.grey[500],
