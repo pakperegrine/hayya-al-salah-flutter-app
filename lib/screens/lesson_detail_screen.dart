@@ -175,8 +175,14 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> {
       appBar: AppBar(
         title: buildUnicodeText(
           'Topic: ${widget.topic.title}',
-          style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+          style: GoogleFonts.inter(
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+          ),
         ),
+        backgroundColor: const Color(0xFF1B5E20),
+        foregroundColor: Colors.white,
+        elevation: 0,
       ),
       body: Column(
         children: [
@@ -186,8 +192,8 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> {
             padding: const EdgeInsets.all(20),
             decoration: const BoxDecoration(
               gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
                 colors: [
                   Color(0xFF1B5E20),
                   Color(0xFF23514C),
@@ -202,6 +208,7 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> {
                   style: GoogleFonts.inter(
                     fontSize: 24,
                     color: Colors.white,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
                 const SizedBox(height: 8),

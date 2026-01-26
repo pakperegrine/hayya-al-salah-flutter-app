@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../data/topics_data.dart';
 import '../models/topic.dart';
-import '../services/api_service.dart';
 import '../services/app_localizations.dart';
 import '../services/favorites_service.dart';
 import 'lesson_detail_screen.dart';
+import 'prayer_animation_screen.dart';
+import 'wudu_animation_screen.dart';
 
 class TopicsScreen extends StatefulWidget {
   const TopicsScreen({super.key});
@@ -16,7 +18,6 @@ class TopicsScreen extends StatefulWidget {
 
 class _TopicsScreenState extends State<TopicsScreen> {
   final TextEditingController _searchController = TextEditingController();
-  final ApiService _apiService = ApiService();
   final FavoritesService _favoritesService = FavoritesService.instance;
   List<Topic> _filteredTopics = [];
   List<Topic> _allTopics = [];
@@ -33,36 +34,14 @@ class _TopicsScreenState extends State<TopicsScreen> {
       _isLoading = true;
     });
 
-    try {
-      await _apiService.initialize();
-      final topics = await _apiService.getTopics();
+    // Simulate a short delay for smooth UX
+    await Future.delayed(const Duration(milliseconds: 300));
 
-      setState(() {
-        _allTopics = topics;
-        _filteredTopics = _allTopics;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _allTopics = [];
-        _filteredTopics = _allTopics;
-        _isLoading = false;
-      });
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Failed to load topics. Please try again.'),
-            backgroundColor: Colors.red,
-            action: SnackBarAction(
-              label: 'Retry',
-              textColor: Colors.white,
-              onPressed: _loadTopics,
-            ),
-          ),
-        );
-      }
-    }
+    setState(() {
+      _allTopics = topicsData;
+      _filteredTopics = _allTopics;
+      _isLoading = false;
+    });
   }
 
   void _filterTopics(String query) {
@@ -160,12 +139,28 @@ class _TopicsScreenState extends State<TopicsScreen> {
       ),
       child: InkWell(
         onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => LessonDetailScreen(topic: topic),
-            ),
-          );
+          if (topic.action == 'lectures') {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => LessonDetailScreen(topic: topic),
+              ),
+            );
+          } else if (topic.action == 'prayer') {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => PrayerAnimationScreen(topic: topic),
+              ),
+            );
+          } else if (topic.action == 'wudu') {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => WuduAnimationScreen(topic: topic),
+              ),
+            );
+          }
         },
         borderRadius: BorderRadius.circular(16),
         child: Padding(
@@ -229,7 +224,7 @@ class _TopicsScreenState extends State<TopicsScreen> {
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          '${topic.lessonsCount} lessons',
+                          '${topic.lessonsCount} ${topic.action == 'lectures' ? 'lessons' : 'topics'}',
                           style: GoogleFonts.inter(
                             fontSize: 12,
                             color: Colors.grey[600],

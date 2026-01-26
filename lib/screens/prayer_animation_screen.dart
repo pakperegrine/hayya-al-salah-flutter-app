@@ -97,7 +97,10 @@ class _PrayerAnimationScreenState extends State<PrayerAnimationScreen> {
       appBar: AppBar(
         title: buildUnicodeText(
           'Topic: ${widget.topic.title}',
-          style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+          style: GoogleFonts.inter(
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+          ),
         ),
         backgroundColor: const Color(0xFF1B5E20),
         foregroundColor: Colors.white,
@@ -222,7 +225,7 @@ class _PrayerAnimationScreenState extends State<PrayerAnimationScreen> {
                                     true)
                                 ? Center(
                                     child: Text(
-                                      'No verses available',
+                                      'لا توجد آيات متاحة',
                                       style: GoogleFonts.inter(
                                         fontSize: 14,
                                         color: Colors.grey[600],
@@ -331,8 +334,8 @@ class _PrayerAnimationScreenState extends State<PrayerAnimationScreen> {
           // Main Title
           Text(
             item.arabic,
-            style: GoogleFonts.inter(
-              fontSize: 12,
+            style: GoogleFonts.amiri(
+              fontSize: 14,
               fontWeight: FontWeight.bold,
               color: const Color(0xFF1B5E20),
             ),
@@ -343,19 +346,23 @@ class _PrayerAnimationScreenState extends State<PrayerAnimationScreen> {
 
           // Urdu
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: Colors.orange[50],
               borderRadius: BorderRadius.circular(8),
-            ),
-            child: buildUnicodeText(
-              item.urdu,
-              style: GoogleFonts.inter(
-                fontSize: 12,
-                color: Colors.black87,
-                height: 1.2,
+              border: Border.all(
+                color: const Color(0xFF1B5E20).withOpacity(0.2),
+                width: 1,
               ),
-              textAlign: TextAlign.center,
+            ),
+            child: Text(
+              item.urdu,
+              style: GoogleFonts.amiri(
+                fontSize: 14,
+                height: 1.3,
+                color: Colors.black87,
+              ),
+              textAlign: TextAlign.right,
             ),
           ),
 
@@ -363,17 +370,21 @@ class _PrayerAnimationScreenState extends State<PrayerAnimationScreen> {
 
           // english
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: Colors.green[50],
               borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: const Color(0xFF1B5E20).withOpacity(0.2),
+                width: 1,
+              ),
             ),
             child: buildUnicodeText(
               item.english,
               style: GoogleFonts.inter(
-                fontSize: 12,
+                fontSize: 13,
                 color: Colors.black87,
-                height: 1.2,
+                height: 1.6,
               ),
               textAlign: TextAlign.center,
             ),

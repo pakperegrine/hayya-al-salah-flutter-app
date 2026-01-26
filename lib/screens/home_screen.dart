@@ -8,8 +8,9 @@ import '../services/api_service.dart';
 import '../services/islamic_calendar_service.dart';
 import '../services/quran_api_service.dart';
 import 'lesson_detail_screen.dart';
-import 'prayer_animation_screen.dart';
 import 'notification_screen.dart';
+import 'prayer_animation_screen.dart';
+import 'wudu_animation_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -399,9 +400,8 @@ class _HomeScreenState extends State<HomeScreen> {
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
-                children: _topics
-                    .map((topic) => _buildTopicCard(topic))
-                    .toList(),
+                children:
+                    _topics.map((topic) => _buildTopicCard(topic)).toList(),
               ),
             ),
           ),
@@ -427,7 +427,6 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       child: InkWell(
         onTap: () {
-
           if (topic.action == 'lectures') {
             Navigator.push(
               context,
@@ -440,6 +439,13 @@ class _HomeScreenState extends State<HomeScreen> {
               context,
               MaterialPageRoute(
                 builder: (context) => PrayerAnimationScreen(topic: topic),
+              ),
+            );
+          } else if (topic.action == 'wudu') {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => WuduAnimationScreen(topic: topic),
               ),
             );
           }
@@ -495,7 +501,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     const SizedBox(height: 8), // Fixed spacing
                     Text(
-                      '${topic.lessonsCount} ${topic.action == 'lectures' ? 'lessons' : 'slides'}',
+                      '${topic.lessonsCount} ${topic.action == 'lectures' ? 'lessons' : 'topics'}',
                       style: GoogleFonts.inter(
                         fontSize: 11,
                         color: Colors.grey[500],

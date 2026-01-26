@@ -1,4 +1,4 @@
-package com.pakperegrine.hayya-alal-salah
+package com.pakperegrine.hayya_al_salah
 
 import io.flutter.embedding.android.FlutterActivity
 
